@@ -1,7 +1,7 @@
-
-H
-D / 2.014 /
-O
-N
-END
-SPECIES
+ELEM h
+ELEM D/2.014/
+ELEM O
+30
+SPEC ! SPEC is equivalent to SPECIES
+H2 O2
+H O OH HO2 N2 N NO
