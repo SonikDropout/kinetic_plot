@@ -1,13 +1,16 @@
 from json import loads
 import re
 
+
 class Error(Exception):
     pass
+
 
 def elements_from_json():
     weights_json = open("elementsWeights.json", "r")
     weights_data = weights_json.read()
     return loads(weights_data)
+
 
 def chemkin_parser(input_file, acceptable_elements_dict):
     """ 
@@ -28,7 +31,7 @@ def chemkin_parser(input_file, acceptable_elements_dict):
         elif inelem(line, is_in_elem):
             is_in_elem = True
             elemhandler(line, linenum, elements_dict, acceptable_elements_dict)
-        elif inspec(line, linenum, is_in_spec, is_in_elem):
+        elif inspec(line, is_in_spec):
             if is_in_elem:
                 is_in_elem = False
 #            else:
@@ -37,7 +40,8 @@ def chemkin_parser(input_file, acceptable_elements_dict):
                 #TODO correct error raising
             is_in_spec = True
             spechandler(line, linenum, species_dict, elements_dict)
-            
+
+
 def elemhandler(line, linenum, elements_dict, acceptable_elements_dict):
     """
     Handles elements data string, adds declared elements and thier atomic
@@ -67,19 +71,20 @@ def elemhandler(line, linenum, elements_dict, acceptable_elements_dict):
         else:
             raise Error(f'An error occured in chemkin input on line ({linenum}): \
                           invalid element \'{element}\'')
-    
+
+
 def spechandler(line, linenum, spec_dict, elem_dict):
     line = clearline(line)
     spec_list = line.split()
+    spec_pattern = specpattern(elem_dict)
     for spec in spec_list:
-        spec_dict[spec] = 0 #TODO this may lead to dictionary clogging
-        elements_in_spec = re.findall(r'([A-Z]{1,2})(\d{1,2})?', spec) #TODO compile another pattern form elements dictionary
-        print(re.match(r'([A-Z]{1,2})(\d{1,2})?', spec))
+        spec_dict[spec] = 0 # TODO this may lead to dictionary clogging
+        elements_in_spec = spec_pattern.findall(spec)
         for elem in elements_in_spec:
             atom = elem[0]
             coefficient = 1
             try:
-                coefficient += int(elem[1])
+                coefficient += int(elem[1]) - 1
             except ValueError:
                 pass
             if atom in elem_dict:
@@ -88,13 +93,26 @@ def spechandler(line, linenum, spec_dict, elem_dict):
                 del spec_dict[spec]
                 raise Error(f'An error occured in chemkin input on line ({linenum}): \
                             spec \'{spec}\' contains undefined element \'{atom}\'')
-    
+
+
 def inelem(line, flag):
     return (line.startswith("ELEM") or flag) and (not line.startswith("SPEC"))
 
-def inspec(line, linenum, flag, prevflag):
+
+def inspec(line, flag):
     return (line.startswith("SPEC") or flag) and (not line.startswith("TERM"))
-    
+
+
+def specpattern(elements_dict):
+    pattern = '('
+    for atom in elements_dict:
+        pattern += atom + '|'
+    pattern = pattern.rstrip('|')
+    pattern += ')(\\d{1,2})?'
+    pattern = re.compile(pattern)
+    return pattern
+
+
 def clearline(line):
     """
     removes keywords and comments from chemkin line
@@ -104,11 +122,13 @@ def clearline(line):
         line = re.sub(pattern, '', line)
     return line
 
+
 def main():
     chemkin_input = open("input/chemkinInput.txt", "r")        
     try:    
         chemkin_parser(chemkin_input, elements_from_json())
     except Error as err:
         print(err)
+
 
 main()
