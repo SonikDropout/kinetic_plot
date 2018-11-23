@@ -1,5 +1,5 @@
 from json import loads
-from handlers import elemhandler, spechandler
+from handlers import *
 
 
 class Error(Exception):
@@ -18,6 +18,7 @@ def chemkin_parser(input_file, acceptable_elements_dict):
     """
     elements_dict = {}
     species_dict = {}
+    spec = ''
     is_in_elem = False
     is_in_spec = False
     is_in_ther = False
@@ -40,6 +41,18 @@ def chemkin_parser(input_file, acceptable_elements_dict):
                 #TODO correct error raising
             is_in_spec = True
             spechandler(line, linenum, species_dict, elements_dict)
+        elif line.startswith("THER"):
+            is_in_spec = False
+            is_in_ther = True
+            if "ALL" not in line:
+                try:
+                    with open("input/therm.dat", "r") as thermo_data:
+                        for line in thermo_data:
+                            therhandler(line, linenum, species_dict)
+                except OSError:
+                    print('Cannot access thermodynamic data')
+        elif is_in_ther:
+            spec = therhandler(line, spec, species_dict)
 
 
 def inelem(line, flag):
@@ -47,7 +60,7 @@ def inelem(line, flag):
 
 
 def inspec(line, flag):
-    return (line.startswith("SPEC") or flag) and (not line.startswith("TERM"))
+    return (line.startswith("SPEC") or flag) and (not line.startswith("THER"))
 
 
 def main():
