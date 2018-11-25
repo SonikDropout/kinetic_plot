@@ -1,12 +1,13 @@
 from json import loads
 from handlers import *
-
-
-class Error(Exception):
-    pass
+from errors import Error, fileerror, missingblockerror
 
 
 def elements_from_json():
+    """
+    parses json with elements' atomic weight data
+    :return: dictionary of element-weight pairs
+    """
     weights_json = open("elementsWeights.json", "r")
     weights_data = weights_json.read()
     return loads(weights_data)
@@ -18,41 +19,52 @@ def chemkin_parser(input_file, acceptable_elements_dict):
     """
     elements_dict = {}
     species_dict = {}
+    reactions = []
     spec = ''
-    is_in_elem = False
-    is_in_spec = False
-    is_in_ther = False
-    is_in_reac = False
+    prevline = ''
+    flags = {}
+    flags_names = ['elem', 'spec', 'ther', 'reac']
+    for flag_name in flags_names:
+        flags['is_in_' + flag_name] = False
+        flags['was_in_' + flag_name] = False
     linenum = 0
     for line in input_file:
         line = line.upper()
         linenum += 1
-        if line.startswith("!") or line.strip() == "":
+        if line.startswith("!") or line.strip() == "" or line.startswith("END"):
             continue
-        elif inelem(line, is_in_elem):
-            is_in_elem = True
+        elif inelem(line, flags['is_in_elem']):
+            flags['is_in_elem'] = True
+            flags['was_in_elem'] = True
             elemhandler(line, linenum, elements_dict, acceptable_elements_dict)
-        elif inspec(line, is_in_spec):
-            if is_in_elem:
-                is_in_elem = False
-#            else:
-#                raise Error(f'An error occured in chemkin input on line ({linenum}):' \
-#                    'SPECIES block declared before ELEMENTS')
-                #TODO correct error raising
-            is_in_spec = True
+        elif inspec(line, flags['is_in_spec']):
+            if flags['is_in_elem']:
+                flags['is_in_elem'] = False
+            elif not flags['was_in_elem']:
+                missingblockerror("ELEMENTS")
+            flags['is_in_spec'] = True
+            flags['was_in_spec'] = True
             spechandler(line, linenum, species_dict, elements_dict)
         elif line.startswith("THER"):
-            is_in_spec = False
-            is_in_ther = True
+            flags['is_in_spec'] = False
+            flags['is_in_ther'] = True
+            flags['was_in_ther'] = True
             if "ALL" not in line:
-                try:
-                    with open("input/therm.dat", "r") as thermo_data:
-                        for line in thermo_data:
-                            therhandler(line, linenum, species_dict)
-                except OSError:
-                    print('Cannot access thermodynamic data')
-        elif is_in_ther:
-            spec = therhandler(line, spec, species_dict)
+                open_parse_themo_data('input/thermo.dat', species_dict)  # TODO file path is hardcoded
+        elif flags['is_in_ther'] and not line.startswith("REAC"):
+            spec = therhandler('chemkin input', line, linenum, spec, species_dict)
+        elif line.startswith("REAC"):
+            if not flags['was_in_ther']:
+                if flags['was_in_spec']:
+                    open_parse_themo_data('input/thermo.dat', species_dict)
+                    flags['is_in_spec'] = False
+                else:
+                    missingblockerror("SPECIES")
+            flags['is_in_ther'] = False
+            flags['is_in_reac'] = True
+            flags['was_in_reac'] = True
+        elif flags['is_in_reac']:
+            prevline = reachandler(line, linenum, prevline, reactions, species_dict)
 
 
 def inelem(line, flag):
@@ -60,7 +72,24 @@ def inelem(line, flag):
 
 
 def inspec(line, flag):
-    return (line.startswith("SPEC") or flag) and (not line.startswith("THER"))
+    return (line.startswith("SPEC") or flag) and (not line.startswith("THER") and not line.startswith("REAC"))
+
+
+def open_parse_themo_data(path_to_file, species_dict):
+    """
+    tries opening thermodynamic data file and parsing it
+    :param path_to_file: path to themdodynamic '.dat' file
+    :param species_dict: dictionary of species for thermodynamic data to be appended
+    """
+    try:
+        with open(path_to_file, "r") as thermo_data:
+            linenum = 0
+            spec = ''
+            for line in thermo_data:
+                linenum += 1
+                spec = therhandler('thermo data', line, linenum, spec, species_dict)
+    except OSError:
+        fileerror(path_to_file)
 
 
 def main():
@@ -70,8 +99,10 @@ def main():
                 chemkin_parser(chemkin_input, elements_from_json())
             except Error as err:
                 print(err)
-    except OSError:
         print('Cannot open chemkin input file')
+        pass
+    except OSError:
+        pass
 
 
 main()
