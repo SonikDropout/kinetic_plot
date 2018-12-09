@@ -104,7 +104,7 @@ def parsefirstline(file, line, linenum, spec_dict):
         inblockerror(file, linenum)
 
 
-def reachandler(line, linenum, prevline, reactions, spec_dict):
+def reachandler(line, linenum, reaction_index, reactions, spec_dict):
     """
     parses reaction string, joins current line with
     the previous if necessary, appends the dictionary,
@@ -115,27 +115,41 @@ def reachandler(line, linenum, prevline, reactions, spec_dict):
     :param reactions: reactions list to be complemented
     :return: prevline
     """
-    line = clearline(line)
-    if line[-2] == '&':
-        prevline = line
-        return prevline
-    elif prevline != '':
-        line = prevline.strip('&') + line
-        prevline = ''
+    line = line.strip()
+    line_of_parameters = parameters_line(line, reaction_index, reactions)
+    if line_of_parameters:
+        return reaction_index
     reaction_dict = {}
     line.strip()
     reaction = re.match(r'([\w+.\s]+)<?=>?([\w+.\s]+[A-Z]\s)', line)
     reactants = parsereactiongroup(reaction.group(1), linenum, spec_dict)
     products = parsereactiongroup(reaction.group(2), linenum, spec_dict)
     coefficients = line.lstrip(reaction.group()).split()
-    reaction_dict['A'] = coefficients[0]
-    reaction_dict['beta'] = coefficients[1]
-    reaction_dict['E'] = coefficients[2]
+    reaction_dict['FOR_PARAMS'] = get_arrenius_coefficients(coefficients)
     reaction_dict['reactants'] = reactants
     reaction_dict['products'] = products
     reactions.append(reaction_dict)
-    return prevline
+    reaction_index += 1
+    return reaction_index
 
+
+def parameters_line(line, reaction_index, reactions):
+    for key_word in ['REV', 'TROE', 'LOW']:
+        if line.startswith(key_word):
+            coefficients = re.findall(r'(-?\d+\.?(\d+(E[+-])?\d+)?)', line)
+            coefficients = list(map(lambda tup: ''.join(tup), coefficients))
+            reactions[reaction_index][key_word] = get_arrenius_coefficients(coefficients)
+            return reaction_index
+
+
+def get_arrenius_coefficients(coefficients):
+    index = 0
+    parameters_dict = {}
+    for parameter_name in ['A', 'beta', 'E']:
+        parameter_value = float(coefficients[index])
+        parameters_dict[parameter_name] = parameter_value
+        index += 1
+    return parameters_dict
 
 def parsereactiongroup(reaction_part, linenum, spec_dict):
     """

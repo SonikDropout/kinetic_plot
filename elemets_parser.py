@@ -21,7 +21,7 @@ def chemkin_parser(input_file, acceptable_elements_dict):
     species_dict = {}
     reactions = []
     spec = ''
-    prevline = ''
+    reaction_index = 0
     flags = {}
     flags_names = ['elem', 'spec', 'ther', 'reac']
     for flag_name in flags_names:
@@ -64,7 +64,7 @@ def chemkin_parser(input_file, acceptable_elements_dict):
             flags['is_in_reac'] = True
             flags['was_in_reac'] = True
         elif flags['is_in_reac']:
-            prevline = reachandler(line, linenum, prevline, reactions, species_dict)
+            reaction_index = reachandler(line, linenum, reaction_index, reactions, species_dict)
 
 
 def inelem(line, flag):
