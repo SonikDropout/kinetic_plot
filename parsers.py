@@ -33,7 +33,7 @@ def parse_spec_line(line, spec_dict, elem_dict):
         elements_in_spec = spec_pattern.findall(spec)
         for elem in elements_in_spec:
             atom = elem[0]
-            if len(elem) > 1 and elem[1]:
+            if elem[1]:
                 coefficient = int(elem[1])
             else:
                 coefficient = 1
@@ -77,14 +77,19 @@ def parsecoefficients(line):
 
 def parse_first_therm_line(line, spec_dict):
         spec = re.match(r'^\w+[+-]?\s', line).group().rstrip()
+        line = line[-37:]
         phase = re.search(r'[GLS]', line).group()
         spec_dict[spec]['phase'] = phase
         temperatures = re.findall(r'\d+\.\d*', line)
-        map(float, temperatures)
-        temps_low = float(temperatures[0]), float(temperatures[2])
-        temps_up = float(temperatures[2]), float(temperatures[1])
+        temperatures = list(map(float, temperatures))
+        temps_low = temperatures[0], temperatures[2]
+        temps_up = temperatures[2], temperatures[1]
         spec_dict[spec]['temp_ranges'] = [temps_low, temps_up]
         return spec
+
+
+def parse_units(line):
+    return re.findall(r'[A-Z/]+', line.lstrip('REACTIONS'))
 
 
 def parse_reac_line(line, linenum, reaction_index, reactions, spec_dict):
@@ -104,7 +109,7 @@ def parse_reac_line(line, linenum, reaction_index, reactions, spec_dict):
     reaction = re.match(r'([\w+.\s]+)<?=>?([\w+.\s]+)', reaction)
     reactants = parsereactiongroup(reaction.group(1), linenum, spec_dict)
     products = parsereactiongroup(reaction.group(2), linenum, spec_dict)
-    reaction_dict['FOR_PARAMS'] = get_arrenius_coefficients(coefficients)
+    reaction_dict['FOR_ARR_COEFS'] = get_arrenius_coefficients(coefficients)
     reaction_dict['reactants'] = reactants
     reaction_dict['products'] = products
     reactions.append(reaction_dict)
@@ -117,7 +122,7 @@ def get_other_arrenius_coefficients(line, reaction_index, reactions):
         if line.startswith(key_word):
             coefficients = re.findall(r'(-?\d+\.?(?:\d+(?:E[+-])?\d+)?)', line)
             coefficients = list(map(lambda tup: ''.join(tup), coefficients))
-            reactions[reaction_index][key_word + '_PARAMS'] = get_arrenius_coefficients(coefficients)
+            reactions[reaction_index][key_word + '_ARR_COEFFS'] = get_arrenius_coefficients(coefficients)
             return True
     return False
 

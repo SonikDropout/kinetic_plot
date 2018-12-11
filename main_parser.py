@@ -1,4 +1,4 @@
-from json import loads
+from json import loads, dumps
 from parsers import *
 from errors import *
 
@@ -19,9 +19,9 @@ def chemkin_parser(input_file, acceptable_elements_dict):
     """
     elements_dict = {}
     species_dict = {}
-    reactions = []
+    reactions_list = [{'UNITS': 'CAL/MOLE'}]
     spec = ''
-    reaction_index = -1
+    reaction_index = 0
     flags = {}
     flags_names = ['elem', 'spec', 'ther', 'reac']
     for flag_name in flags_names:
@@ -64,11 +64,24 @@ def chemkin_parser(input_file, acceptable_elements_dict):
                 flags['is_in_ther'] = False
                 flags['is_in_reac'] = True
                 flags['was_in_reac'] = True
+                reactions_list[0]['UNITS'] = parse_units(line)
             elif flags['is_in_reac']:
-                reaction_index = parse_reac_line(line, line_number, reaction_index, reactions, species_dict)
+                reaction_index = parse_reac_line(line, line_number, reaction_index, reactions_list, species_dict)
+        except Error as err:
+            print(err)
         except:
             inblockerror(input_file.name, line_number)
-    return
+    output_data = [elements_dict, species_dict, reactions_list]
+    path_to_output = 'output/reactions_data.json'
+    dump_data_to_json(output_data, path_to_output)
+
+
+def dump_data_to_json(data, path):
+    try:
+        with open(path, 'w') as output_file:
+            output_file.write(dumps(data, sort_keys=True, indent=4))
+    except OSError:
+        print('Can not write data to output file')
 
 
 def inelem(line, flag):
