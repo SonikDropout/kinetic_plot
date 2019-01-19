@@ -4,7 +4,7 @@ import numpy as np
 from scipy.integrate import odeint
 from math import exp
 import matplotlib.pyplot as plt
-from os.path import join
+from os import path
 
 
 class KineticMechanism:
@@ -138,26 +138,51 @@ class ReactionMatrices:
         return result
 
 
+class UserDialog:
+
+    def __init__(self):
+        self.__available_files = {
+            "evans": ("KINETIC_MECHANISM_EVANS.DAT", "INITIAL_EVANS.json"),
+            "jakimovski": ("KINETIC_MECHANISM_JAKIMOVSKI.DAT", "INITIAL_JAKIMOVSKI.json"),
+            "jakimovski_short": ("KINETIC_MECHANISM_JAK_SHORT.DAT", "INITIAL_JAK_SHORT.json")
+            }
+        self.__finished = False
+
+    def ask_for_mech(self):
+        print('\nAvailable kinetic mechanisms:')
+        for i, key in enumerate(self.__available_files):
+            print(f'    [{i}] {key}')
+        return int(input(f'\nSelect mechanism[0-{i}]: '))
+
+    @staticmethod
+    def ask_time():
+        return float(input('\nEnter max time in seconds: '))
+
+    def get_paths(self):
+        mech_index = self.ask_for_mech()
+        file_names_list = list(self.__available_files.values())
+        return path.join('input', file_names_list[mech_index][0]), \
+            path.join('input', file_names_list[mech_index][1])
+
+    def start(self):
+        while not self.__finished:
+            mechanism_path, initial_conditions_path = self.get_paths()
+
+            mechanism = KineticMechanism(mechanism_path, initial_conditions_path)
+            mechanism.set_max_time(self.ask_time())
+
+            mechanism.build_plot()
+
+            self.confirm_exit()
+
+    def confirm_exit(self):
+        answer = input('\n\nProceed to other mechanism[y/N]: ') or 'N'
+        if answer == 'N':
+            self.__finished = True
+
+
 if __name__ == '__main__':
-    mechanism_data = {
-        'evans': 'KINETIC_MECHANISM_EVANS.DAT',
-        'jakimovski': 'KINETIC_MECHANISM_JAKIMOVSKI.DAT',
-        'jakimovski_short': 'KINETIC_MECHANISM_JAK_SHORT.DAT'
-    }
-    initial_conditions = {
-        "evans": "INITIAL_EVANS.json",
-        "jakimovski": "initial_jakimovski.json",
-        "jakimovski_short": "initial_conditions.json"
-    }
 
-    for i, key in enumerate(mechanism_data):
-        print(f'{i}. {key}')
-    mech_index = int(input('Select kinetic mechanism: '))
-    time = float(input('Enter max time in seconds: '))
+    dialog = UserDialog()
+    dialog.start()
 
-    mechanism_path = join('input', list(mechanism_data.values())[mech_index])
-    initial_conditions_path = join('input', list(initial_conditions.values())[mech_index])
-
-    mechanism = KineticMechanism(mechanism_path, initial_conditions_path)
-    mechanism.set_max_time(time)
-    mechanism.build_plot()
