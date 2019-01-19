@@ -109,7 +109,7 @@ def parse_reac_line(line, linenum, reaction_index, reactions, spec_dict):
     reaction = re.match(r'([\w+.\s]+)<?=>?([\w+.\s]+)', reaction)
     reactants = parsereactiongroup(reaction.group(1), linenum, spec_dict)
     products = parsereactiongroup(reaction.group(2), linenum, spec_dict)
-    reaction_dict['FOR_ARR_COEFS'] = get_arrenius_coefficients(coefficients)
+    reaction_dict['FOR_ARR_COEFFS'] = get_arrenius_coefficients(coefficients)
     reaction_dict['reactants'] = reactants
     reaction_dict['products'] = products
     reactions.append(reaction_dict)

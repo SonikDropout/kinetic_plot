@@ -1,5 +1,5 @@
 from json import loads, dumps
-from parsers import *
+from line_parsers import *
 from errors import *
 
 
@@ -8,12 +8,12 @@ def elements_from_json():
     parses json with elements' atomic weight data
     :return: dictionary of element-weight pairs
     """
-    weights_json = open("elementsWeights.json", "r")
+    weights_json = open("input/elementsWeights.json", "r")
     weights_data = weights_json.read()
     return loads(weights_data)
 
 
-def chemkin_parser(input_file, acceptable_elements_dict):
+def parse_chemkin(input_file, acceptable_elements_dict):
     """ 
     Parses chemkin input file line by line
     """
@@ -51,13 +51,13 @@ def chemkin_parser(input_file, acceptable_elements_dict):
                 flags['is_in_ther'] = True
                 flags['was_in_ther'] = True
                 if "ALL" not in line:
-                    open_parse_themo_data('input/thermo.dat', species_dict)  # TODO file path is hardcoded
+                    open_parse_thermo_data('input/thermo.dat', species_dict)  # TODO file path is hardcoded
             elif flags['is_in_ther'] and not line.startswith("REAC"):
                 spec = parse_therm_line(line, spec, species_dict)
             elif line.startswith("REAC"):
                 if not flags['was_in_ther']:
                     if flags['was_in_spec']:
-                        open_parse_themo_data('input/thermo.dat', species_dict)
+                        open_parse_thermo_data('input/thermo.dat', species_dict)
                         flags['is_in_spec'] = False
                     else:
                         missingblockerror("SPECIES")
@@ -74,6 +74,7 @@ def chemkin_parser(input_file, acceptable_elements_dict):
     output_data = [elements_dict, species_dict, reactions_list]
     path_to_output = 'output/reactions_data.json'
     dump_data_to_json(output_data, path_to_output)
+    return output_data
 
 
 def dump_data_to_json(data, path):
@@ -92,7 +93,7 @@ def inspec(line, flag):
     return (line.startswith("SPEC") or flag) and (not line.startswith("THER") and not line.startswith("REAC"))
 
 
-def open_parse_themo_data(path_to_file, species_dict):
+def open_parse_thermo_data(path_to_file, species_dict):
     """
     tries opening thermodynamic data file and parsing it
     :param path_to_file: path to themdodynamic '.dat' file
@@ -109,16 +110,16 @@ def open_parse_themo_data(path_to_file, species_dict):
         fileerror(path_to_file)
 
 
-def main():
+def open_parse_chemkin_input(path_to_file):
     try:
-        with open("input/KINETIC_MECHANISM_EVANS.DAT", "r") as chemkin_input:
-            try:
-                chemkin_parser(chemkin_input, elements_from_json())
-            except Error as err:
-                print(err)
-    except OSError:
-        print('Cannot open chemkin input file')
-        pass
+        with open(path_to_file, "r") as chemkin_input:
+            return parse_chemkin(chemkin_input, elements_from_json())
+    except OSError as e:
+        print(e)
+    except Error as e:
+        print(e)
 
 
-main()
+if __name__ == '__main__':
+    open_parse_chemkin_input("input/KINETIC_MECHANISM_EVANS.DAT")
+
