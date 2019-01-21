@@ -1,16 +1,17 @@
-from parser import open_parse_chemkin_input
+from main_parser import open_parse_chemkin_input
 from json import loads
 import numpy as np
 from scipy.integrate import odeint
 from math import exp
 import matplotlib.pyplot as plt
-from os import path
+import os
 
 
 class KineticMechanism:
 
-    def __init__(self, mechanism_path, initial_conditions_path):
-        self.elements, self.species, self.reactions = self.parse_input(mechanism_path)
+    def __init__(self, name, chemkin_path, initial_conditions_path):
+        self.name = name
+        self.elements, self.species, self.reactions = self.parse_input(chemkin_path)
         self.__initial_conditions = self.get_initial_conditions_from(initial_conditions_path)
         self.max_time = 1000
 
@@ -39,18 +40,22 @@ class KineticMechanism:
             if np.amax(data[i]) > 0.01:
                 plt.plot(t, data[i], label=specie)
         plt.legend(loc='best')
-        self.render_figure()
+        self.decorate_plot()
+        plt.show()
+        # self.save_figure()
 
-    @staticmethod
-    def render_figure():
+    def decorate_plot(self):
         plt.grid(True, 'both', alpha=0.5)
         plt.xlabel('time, s')
         plt.xscale('log')
         plt.yticks(np.linspace(0, 1, 11))
         plt.ylabel('Molar fraction')
         plt.ylim(0, 1)
-        plt.title('Molar fraction variation over time')
-        plt.show()
+        plt.title(f'T={self.__initial_conditions["temperature"]}K')
+
+    def save_figure(self):
+        plot_path = os.path.join('output/plots', f'{self.name}_T={self.__initial_conditions["temperature"]}K.png')
+        plt.savefig(plot_path, format='png')
 
 
 class ODESystem:
@@ -62,7 +67,7 @@ class ODESystem:
 
     def solve(self):
         C0 = self.get_initial_concentrations()
-        t = np.linspace(0, self.max_time, 1000000)
+        t = np.linspace(0, self.max_time, 10000000)
         dC_dt = self.get_model()
         solution = odeint(dC_dt, C0, t)
         return solution, t
@@ -156,19 +161,22 @@ class UserDialog:
 
     @staticmethod
     def ask_time():
-        return float(input('\nEnter max time in seconds: '))
+        return float(input('Enter max time in seconds: '))
 
     def get_paths(self):
         mech_index = self.ask_for_mech()
+        mech_name = list(self.__available_files.keys())[mech_index]
         file_names_list = list(self.__available_files.values())
-        return path.join('input', file_names_list[mech_index][0]), \
-            path.join('input', file_names_list[mech_index][1])
+        return mech_name, \
+            os.path.join('input', file_names_list[mech_index][0]), \
+            os.path.join('input', file_names_list[mech_index][1])
 
     def start(self):
         while not self.__finished:
-            mechanism_path, initial_conditions_path = self.get_paths()
+            mechanism_name, mechanism_path, initial_conditions_path = self.get_paths()
+            self.confirm_edit(initial_conditions_path)
 
-            mechanism = KineticMechanism(mechanism_path, initial_conditions_path)
+            mechanism = KineticMechanism(mechanism_name, mechanism_path, initial_conditions_path)
             mechanism.set_max_time(self.ask_time())
 
             mechanism.build_plot()
@@ -176,9 +184,17 @@ class UserDialog:
             self.confirm_exit()
 
     def confirm_exit(self):
-        answer = input('\n\nProceed to other mechanism[y/N]: ') or 'N'
+        answer = input('\nProceed to other mechanism[y/N]: ') or 'N'
         if answer == 'N':
             self.__finished = True
+
+    @staticmethod
+    def confirm_edit(initial_conditions_path):
+        with open(initial_conditions_path, 'r') as ini_conditions:
+            print(f'\n{ini_conditions.read()}')
+        answer = input('Edit initial conditions JSON[y/N]: ') or 'N'
+        if answer == 'y':
+            os.system(f'vim {initial_conditions_path}')
 
 
 if __name__ == '__main__':
